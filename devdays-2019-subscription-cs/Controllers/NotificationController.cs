@@ -22,6 +22,8 @@ namespace devdays_2019_subscription_cs.Controllers
     {
         #region Class Variables . . .
 
+        private static int _notificationCount;
+
         #endregion Class Variables . . .
 
         #region Instance Variables . . .
@@ -41,6 +43,7 @@ namespace devdays_2019_subscription_cs.Controllers
 
         static NotificationController()
         {
+            _notificationCount = 0;
         }
 
         ///-------------------------------------------------------------------------------------------------
@@ -97,11 +100,83 @@ namespace devdays_2019_subscription_cs.Controllers
 
                     fhir.Bundle bundle = JsonConvert.DeserializeObject<fhir.Bundle>(content);
 
-                    // 
+                    // **** grab the fields we need out of the notification ****
+
+                    int eventCount = -1;
+                    int bundleEventCount = -1;
+                    string status = "";
+                    string topicUrl = "";
+                    string subscriptionUrl = "";
+
+
+                    if ((bundle != null) &&
+                        (bundle.Meta != null) &&
+                        (bundle.Meta.Extension != null))
+                    {
+                        // **** loop over extensions ****
+
+                        foreach (fhir.Extension element in bundle.Meta.Extension)
+                        {
+                            if (element.Url.EndsWith("subscription-event-count"))
+                            {
+                                eventCount = (int)element.ValueUnsignedInt;
+                            }
+                            else if (element.Url.EndsWith("bundle-event-count"))
+                            {
+                                bundleEventCount = (int)element.ValueUnsignedInt;
+                            }
+                            else if (element.Url.EndsWith("subscription-status"))
+                            {
+                                status = element.ValueString;
+                            }
+                            else if (element.Url.EndsWith("subscription-topic-url"))
+                            {
+                                topicUrl = element.ValueUrl;
+                            }
+                            else if (element.Url.EndsWith("subscription-url"))
+                            {
+                                subscriptionUrl = element.ValueUrl;
+                            }
+                        }
+                    }
+
+                    // **** check for being a handshake ****
+
+                    if (eventCount == 0)
+                    {
+                        Console.WriteLine($"Handshake:\n" +
+                            $"\tTopic:         {topicUrl}\n" +
+                            $"\tSubscription:  {subscriptionUrl}\n" +
+                            $"\tStatus:        {status}"
+                            );
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Notification {eventCount}:\n" +
+                            $"\tTopic:         {topicUrl}\n" +
+                            $"\tSubscription:  {subscriptionUrl}\n" +
+                            $"\tStatus:        {status}\n" +
+                            $"\tBundle Events: {bundleEventCount}\n" +
+                            $"\tTotal Events:  {eventCount}"
+                            );
+                    }
+
+                    // **** increment our received notification count ****
+
+                    _notificationCount++;
+
+                    // **** check for being done ****
+
+                    if (_notificationCount == 2)
+                    {
+                        Program.DeleteSubscription().Wait(2000);
+                        Environment.Exit(0);
+                    }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Console.WriteLine($"Error processing notification: {ex.Message}");
                 return StatusCode(500);
             }
 

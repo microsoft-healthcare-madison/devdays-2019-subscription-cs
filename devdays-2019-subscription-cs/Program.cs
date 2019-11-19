@@ -25,6 +25,8 @@ namespace devdays_2019_subscription_cs
         
         private static CamelCasePropertyNamesContractResolver _contractResolver;
 
+        private static string _subscriptionId;
+
         ///-------------------------------------------------------------------------------------------------
         /// <summary>Gets or sets the configuration.</summary>
         ///
@@ -71,7 +73,7 @@ namespace devdays_2019_subscription_cs
             {
                 CreateWebHostBuilder(args).Build().Run();
             })).Start();
-            
+
 
             // **** start our process ****
 
@@ -128,6 +130,8 @@ namespace devdays_2019_subscription_cs
                 Console.WriteLine("Failed to create subscription!");
                 Environment.Exit(1);
             }
+
+            await Task.Delay(500);
 
             // **** post an encounter ****
 
@@ -187,6 +191,8 @@ namespace devdays_2019_subscription_cs
                         "application/fhir+json"
                         ),
                 };
+                request.Headers.Add("Prefer", "return=representation");
+
 
                 // **** make our request ****
 
@@ -195,6 +201,7 @@ namespace devdays_2019_subscription_cs
                 // **** check the status code ****
 
                 if ((response.StatusCode != System.Net.HttpStatusCode.OK) &&
+                    (response.StatusCode != System.Net.HttpStatusCode.Created) &&
                     (response.StatusCode != System.Net.HttpStatusCode.Accepted) &&
                     (response.StatusCode != System.Net.HttpStatusCode.NoContent))
                 {
@@ -295,6 +302,70 @@ namespace devdays_2019_subscription_cs
                         "application/fhir+json"
                         ),
                 };
+                request.Headers.Add("Prefer", "return=representation");
+
+                // **** make our request ****
+
+                HttpResponseMessage response = await _restClient.SendAsync(request);
+
+                // **** check the status code ****
+
+                if ((response.StatusCode != System.Net.HttpStatusCode.OK) &&
+                    (response.StatusCode != System.Net.HttpStatusCode.Created) &&
+                    (response.StatusCode != System.Net.HttpStatusCode.Accepted) &&
+                    (response.StatusCode != System.Net.HttpStatusCode.NoContent))
+                {
+                    Console.WriteLine($" Could not Post Subscription: {request.RequestUri.ToString()} returned: {response.StatusCode}");
+                    return false;
+                }
+
+                // **** parse the return ****
+
+                string body = await response.Content.ReadAsStringAsync();
+
+                fhir.Subscription sub = JsonConvert.DeserializeObject<fhir.Subscription>(body);
+
+                // **** grab the subscription id so we can clean up ****
+
+                _subscriptionId = sub.Id;
+
+                // **** good here ****
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to Create Subscription: {ex.Message}");
+                return false;
+            }
+        }
+
+        ///-------------------------------------------------------------------------------------------------
+        /// <summary>Deletes the subscription.</summary>
+        ///
+        /// <remarks>Gino Canessa, 11/19/2019.</remarks>
+        ///
+        /// <returns>An asynchronous result that yields true if it succeeds, false if it fails.</returns>
+        ///-------------------------------------------------------------------------------------------------
+
+        public static async Task<bool> DeleteSubscription()
+        {
+            try
+            {
+                // **** build our request ****
+
+                HttpRequestMessage request = new HttpRequestMessage()
+                {
+                    Method = HttpMethod.Delete,
+                    RequestUri = GetFhirUri($"Subscription/{_subscriptionId}"),
+                    Headers =
+                    {
+                        Accept =
+                        {
+                            new MediaTypeWithQualityHeaderValue("application/fhir+json")
+                        },
+                    },
+                };
 
                 // **** make our request ****
 
@@ -306,9 +377,11 @@ namespace devdays_2019_subscription_cs
                     (response.StatusCode != System.Net.HttpStatusCode.Accepted) &&
                     (response.StatusCode != System.Net.HttpStatusCode.NoContent))
                 {
-                    Console.WriteLine($" Could not Post Subscription: {request.RequestUri.ToString()} returned: {response.StatusCode}");
+                    Console.WriteLine($" Could not Delete Subscription: {request.RequestUri.ToString()} returned: {response.StatusCode}");
                     return false;
                 }
+
+                Console.WriteLine($"Deleted Subscription: Subscription/{_subscriptionId}");
 
                 // **** good here ****
 
@@ -316,7 +389,7 @@ namespace devdays_2019_subscription_cs
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to Create Subscription: {ex.Message}");
+                Console.WriteLine($"Failed to Delete Subscription: {ex.Message}");
                 return false;
             }
         }
