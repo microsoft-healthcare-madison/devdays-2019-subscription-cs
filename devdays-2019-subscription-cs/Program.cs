@@ -25,6 +25,10 @@ namespace devdays_2019_subscription_cs
         
         private static CamelCasePropertyNamesContractResolver _contractResolver;
 
+        /// <summary>Identifier for the patient (once created).</summary>
+        private static string _patientId;
+
+        /// <summary>Identifier for the subscription (once created).</summary>
         private static string _subscriptionId;
 
         ///-------------------------------------------------------------------------------------------------
@@ -119,7 +123,7 @@ namespace devdays_2019_subscription_cs
 
             if (!(await CreatePatientIfRequired()))
             {
-                Console.WriteLine($"Failed to verify patient: Patient/{Configuration["Basic_Patient_Id"]}");
+                Console.WriteLine($"Failed to verify patient: Patient/{_patientId}");
                 System.Environment.Exit(1);
             }
 
@@ -160,7 +164,7 @@ namespace devdays_2019_subscription_cs
                     Status = EncounterStatusCodes.IN_PROGRESS,
                     Subject = new Reference()
                     {
-                        reference = $"Patient/{Configuration["Basic_Patient_Id"]}"
+                        reference = $"Patient/{_patientId}"
                     }
                 };
 
@@ -264,7 +268,7 @@ namespace devdays_2019_subscription_cs
                         {
                             MatchType = SubscriptionFilterByMatchTypeCodes.EQUALS,
                             Name = "patient",
-                            Value = $"Patient/{Configuration["Basic_Patient_Id"]}"
+                            Value = $"Patient/{_patientId}"
                         },
                     },
                     Topic = new Reference()
@@ -408,12 +412,16 @@ namespace devdays_2019_subscription_cs
 
             try
             {
+                // **** create a patient id ****
+
+                _patientId = Guid.NewGuid().ToString();
+
                 // **** build our request ****
 
                 HttpRequestMessage request = new HttpRequestMessage()
                 {
                     Method = HttpMethod.Get,
-                    RequestUri = GetFhirUri($"Patient/{Configuration["Basic_Patient_Id"]}"),
+                    RequestUri = GetFhirUri($"Patient/{_patientId}"),
                     Headers =
                     {
                         Accept =
@@ -431,8 +439,7 @@ namespace devdays_2019_subscription_cs
 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
-                    Console.WriteLine($" Could not get Patient: {request.RequestUri.ToString()} returned: {response.StatusCode}");
-                    return false;
+                    return (await CreatePatient());
                 }
 
                 string content = await response.Content.ReadAsStringAsync();
@@ -455,7 +462,7 @@ namespace devdays_2019_subscription_cs
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to Get Patient/{Configuration["Basic_Patient_Id"]}: {ex.Message}");
+                Console.WriteLine($"Failed to Get Patient/{_patientId}: {ex.Message}");
                 return (await CreatePatient());
             }
         }
@@ -476,7 +483,7 @@ namespace devdays_2019_subscription_cs
             {
                 fhir.Patient patient = new Patient()
                 {
-                    Id = Configuration["Basic_Patient_Id"],
+                    Id = _patientId,
                     Name = new fhir.HumanName[]
                     {
                         new fhir.HumanName()
@@ -503,7 +510,7 @@ namespace devdays_2019_subscription_cs
                 HttpRequestMessage request = new HttpRequestMessage()
                 {
                     Method = HttpMethod.Put,
-                    RequestUri = GetFhirUri($"Patient/{Configuration["Basic_Patient_Id"]}"),
+                    RequestUri = GetFhirUri($"Patient/{_patientId}"),
                     Headers =
                     {
                         Accept =
@@ -525,6 +532,7 @@ namespace devdays_2019_subscription_cs
                 // **** check the status code ****
 
                 if ((response.StatusCode != System.Net.HttpStatusCode.OK) &&
+                    (response.StatusCode != System.Net.HttpStatusCode.Created) &&
                     (response.StatusCode != System.Net.HttpStatusCode.Accepted) &&
                     (response.StatusCode != System.Net.HttpStatusCode.NoContent))
                 {
@@ -538,7 +546,7 @@ namespace devdays_2019_subscription_cs
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to Create Patient/{Configuration["Basic_Patient_Id"]}: {ex.Message}");
+                Console.WriteLine($"Failed to Create Patient/{_patientId}: {ex.Message}");
                 return false;
             }
         }
