@@ -94,21 +94,21 @@ namespace devdays_2019_subscription_cs
         {
             // **** get a list of topics ****
 
-            List<fhir.Topic> topics = await GetTopics();
+            List<fhir.SubscriptionTopic> topics = await GetTopics();
 
             if ((topics == null) ||
                 (topics.Count == 0))
             {
-                Console.WriteLine("No topics found!");
+                Console.WriteLine("No SubscriptionTopics found!");
                 System.Environment.Exit(1);
             }
 
             // **** list topics in the console ****
 
-            Console.WriteLine("Found Topics:");
-            foreach (Topic topic in topics)
+            Console.WriteLine("Found SubscriptionTopics:");
+            foreach (fhir.SubscriptionTopic topic in topics)
             {
-                Console.WriteLine($" Topic/{topic.Id}:");
+                Console.WriteLine($" SubscriptionTopic/{topic.Id}:");
                 Console.WriteLine(JsonConvert.SerializeObject(
                     topic,
                     Formatting.Indented,
@@ -234,7 +234,7 @@ namespace devdays_2019_subscription_cs
         /// <returns>   An asynchronous result that yields true if it succeeds, false if it fails. </returns>
         ///-------------------------------------------------------------------------------------------------
 
-        public static async Task<bool> CreateSubscription(fhir.Topic topic)
+        public static async Task<bool> CreateSubscription(fhir.SubscriptionTopic topic)
         {
             try
             {
@@ -559,9 +559,9 @@ namespace devdays_2019_subscription_cs
         /// <returns>   The topics. </returns>
         ///-------------------------------------------------------------------------------------------------
 
-        public static async Task<List<fhir.Topic>> GetTopics()
+        public static async Task<List<fhir.SubscriptionTopic>> GetTopics()
         {
-            List<fhir.Topic> topics = new List<Topic>();
+            List<fhir.SubscriptionTopic> topics = new List<fhir.SubscriptionTopic>();
 
             // **** try to get a list of topics ****
 
@@ -572,7 +572,7 @@ namespace devdays_2019_subscription_cs
                 HttpRequestMessage request = new HttpRequestMessage()
                 {
                     Method = HttpMethod.Get,
-                    RequestUri = GetFhirUri("Topic"),
+                    RequestUri = GetFhirUri("SubscriptionTopic"),
                     Headers =
                     {
                         Accept =
@@ -590,7 +590,7 @@ namespace devdays_2019_subscription_cs
 
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
-                    Console.WriteLine($" Could not get Topics: {request.RequestUri.ToString()} returned: {response.StatusCode}");
+                    Console.WriteLine($" Could not get SubscriptionTopics: {request.RequestUri.ToString()} returned: {response.StatusCode}");
                     return topics;
                 }
 
@@ -598,7 +598,7 @@ namespace devdays_2019_subscription_cs
 
                 // **** deserialize ****
 
-                fhir.Bundle bundle = JsonConvert.DeserializeObject<fhir.Bundle>(content);
+                fhir.Bundle bundle = JsonConvert.DeserializeObject<fhir.Bundle>(content, new fhir.ResourceConverter());
 
                 // **** check for values ****
 
@@ -616,13 +616,15 @@ namespace devdays_2019_subscription_cs
                     {
                         continue;
                     }
+
+                    // **** add this topic (should error check here) ****
                     
-                    topics.Add(((JObject)entry.Resource).ToObject<fhir.Topic>());
+                    topics.Add((fhir.SubscriptionTopic)entry.Resource);
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to Get Topics: {ex.Message}");
+                Console.WriteLine($"Failed to Get SubscriptionTopics: {ex.Message}");
                 return topics;
             }
 
