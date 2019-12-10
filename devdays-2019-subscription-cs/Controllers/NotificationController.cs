@@ -102,7 +102,7 @@ namespace devdays_2019_subscription_cs.Controllers
 
                     // **** grab the fields we need out of the notification ****
 
-                    int eventCount = -1;
+                    long eventCount = -1;
                     int bundleEventCount = -1;
                     string status = "";
                     string topicUrl = "";
@@ -119,7 +119,10 @@ namespace devdays_2019_subscription_cs.Controllers
                         {
                             if (element.Url.EndsWith("subscription-event-count"))
                             {
-                                eventCount = (int)element.ValueUnsignedInt;
+                                if (!Int64.TryParse(element.ValueInteger64, out eventCount))
+                                {
+                                    eventCount = -1;
+                                }
                             }
                             else if (element.Url.EndsWith("bundle-event-count"))
                             {

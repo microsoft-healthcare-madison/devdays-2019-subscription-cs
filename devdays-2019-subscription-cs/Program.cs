@@ -267,7 +267,7 @@ namespace devdays_2019_subscription_cs
                         new SubscriptionFilterBy()
                         {
                             MatchType = SubscriptionFilterByMatchTypeCodes.EQUALS,
-                            Name = "patient",
+                            SearchParamName = "patient",
                             Value = $"Patient/{_patientId}"
                         },
                     },
