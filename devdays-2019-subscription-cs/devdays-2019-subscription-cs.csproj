@@ -9,6 +9,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="devdays-2019-subscription-cs\**" />
+    <EmbeddedResource Remove="devdays-2019-subscription-cs\**" />
+    <None Remove="devdays-2019-subscription-cs\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Remove="appsettings.json" />
   </ItemGroup>
 

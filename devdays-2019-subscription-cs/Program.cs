@@ -1,4 +1,9 @@
-﻿using System;
+﻿// <copyright file="Program.cs" company="Microsoft Corporation">
+//     Copyright (c) Microsoft Corporation. All rights reserved.
+//     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
+// </copyright>
+
+using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -16,13 +21,16 @@ using Newtonsoft.Json.Serialization;
 
 namespace devdays_2019_subscription_cs
 {
-    class Program
+    /// <summary>A program.</summary>
+    public abstract class Program
     {
         /// <summary>A Regex pattern to filter proper base URLs for WebHost.</summary>
         private const string _regexBaseUrlMatch = @"(http[s]*:\/\/[A-Za-z0-9\.]*(:\d+)*)";
 
+        /// <summary>The REST client.</summary>
         private static HttpClient _restClient;
         
+        /// <summary>The contract resolver.</summary>
         private static CamelCasePropertyNamesContractResolver _contractResolver;
 
         /// <summary>Identifier for the patient (once created).</summary>
@@ -31,69 +39,46 @@ namespace devdays_2019_subscription_cs
         /// <summary>Identifier for the subscription (once created).</summary>
         private static string _subscriptionId;
 
-        ///-------------------------------------------------------------------------------------------------
         /// <summary>Gets or sets the configuration.</summary>
-        ///
         /// <value>The configuration.</value>
-        ///-------------------------------------------------------------------------------------------------
-
         public static IConfiguration Configuration { get; set; }
 
-        ///-------------------------------------------------------------------------------------------------
-        /// <summary>   Main entry-point for this application. </summary>
-        ///
-        /// <remarks>   Gino Canessa, 11/18/2019. </remarks>
-        ///
-        /// <param name="args"> The arguments. </param>
-        ///-------------------------------------------------------------------------------------------------
-
+        /// <summary>Main entry-point for this application.</summary>
+        /// <param name="args">The arguments.</param>
         public static void Main(string[] args)
         {
-            // **** setup our configuration (command line > environment > appsettings.json) ****
-
+            // setup our configuration (command line > environment > appsettings.json)
             Configuration = new ConfigurationBuilder()
                 .AddJsonFile("appsettings.json", optional: true)
                 .AddEnvironmentVariables()
                 .Build()
                 ;
 
-            // **** update configuration to make sure listen url is properly formatted ****
-
+            // update configuration to make sure listen url is properly formatted
             Regex regex = new Regex(_regexBaseUrlMatch);
             Match match = regex.Match(Configuration["Basic_Internal_Url"]);
             Configuration["Basic_Internal_Url"] = match.ToString();
 
-            // **** create our rest client ****
-
+            // create our rest client
             _restClient = new HttpClient();
 
-            // **** configure serialization ****
-
+            // configure serialization
             _contractResolver = new CamelCasePropertyNamesContractResolver();
 
-            // **** create our web host ****
-
+            // create our web host
             (new Thread(() =>
             {
                 CreateWebHostBuilder(args).Build().Run();
             })).Start();
 
-
-            // **** start our process ****
-
+            // start our process
             StartProcessing();
         }
 
-        ///-------------------------------------------------------------------------------------------------
-        /// <summary>   Starts a processing. </summary>
-        ///
-        /// <remarks>   Gino Canessa, 11/18/2019. </remarks>
-        ///-------------------------------------------------------------------------------------------------
-
+        /// <summary>Starts a processing.</summary>
         public static async void StartProcessing()
         {
-            // **** get a list of topics ****
-
+            // get a list of topics
             List<fhir.SubscriptionTopic> topics = await GetTopics();
 
             if ((topics == null) ||
@@ -103,8 +88,7 @@ namespace devdays_2019_subscription_cs
                 System.Environment.Exit(1);
             }
 
-            // **** list topics in the console ****
-
+            // list topics in the console
             Console.WriteLine("Found SubscriptionTopics:");
             foreach (fhir.SubscriptionTopic topic in topics)
             {
@@ -119,16 +103,14 @@ namespace devdays_2019_subscription_cs
                     }));
             }
 
-            // **** make sure our patient exists ****
-
+            // make sure our patient exists
             if (!(await CreatePatientIfRequired()))
             {
                 Console.WriteLine($"Failed to verify patient: Patient/{_patientId}");
                 System.Environment.Exit(1);
             }
 
-            // **** create our subscription ****
-
+            // create our subscription
             if (!(await CreateSubscription(topics[0])))
             {
                 Console.WriteLine("Failed to create subscription!");
@@ -137,8 +119,7 @@ namespace devdays_2019_subscription_cs
 
             await Task.Delay(500);
 
-            // **** post an encounter ****
-
+            // post an encounter
             if (!(await PostEncounter()))
             {
                 Console.WriteLine("Failed to post encounter");
@@ -146,14 +127,8 @@ namespace devdays_2019_subscription_cs
             }
         }
 
-        ///-------------------------------------------------------------------------------------------------
-        /// <summary>   Posts the encounter. </summary>
-        ///
-        /// <remarks>   Gino Canessa, 11/18/2019. </remarks>
-        ///
-        /// <returns>   An asynchronous result that yields true if it succeeds, false if it fails. </returns>
-        ///-------------------------------------------------------------------------------------------------
-
+        /// <summary>Posts the encounter.</summary>
+        /// <returns>An asynchronous result that yields true if it succeeds, false if it fails.</returns>
         public static async Task<bool> PostEncounter()
         {
             try
@@ -176,7 +151,7 @@ namespace devdays_2019_subscription_cs
                         ContractResolver = _contractResolver,
                     });
 
-                // **** build our request ****
+                // build our request
 
                 HttpRequestMessage request = new HttpRequestMessage()
                 {
@@ -198,12 +173,10 @@ namespace devdays_2019_subscription_cs
                 request.Headers.Add("Prefer", "return=representation");
 
 
-                // **** make our request ****
-
+                // make our request
                 HttpResponseMessage response = await _restClient.SendAsync(request);
 
-                // **** check the status code ****
-
+                // check the status code
                 if ((response.StatusCode != System.Net.HttpStatusCode.OK) &&
                     (response.StatusCode != System.Net.HttpStatusCode.Created) &&
                     (response.StatusCode != System.Net.HttpStatusCode.Accepted) &&
@@ -213,8 +186,7 @@ namespace devdays_2019_subscription_cs
                     return false;
                 }
 
-                // **** good here ****
-
+                // good here
                 return true;
             }
             catch (Exception ex)
@@ -224,16 +196,9 @@ namespace devdays_2019_subscription_cs
             }
         }
 
-        ///-------------------------------------------------------------------------------------------------
-        /// <summary>   Creates a subscription. </summary>
-        ///
-        /// <remarks>   Gino Canessa, 11/18/2019. </remarks>
-        ///
-        /// <param name="topic">    The topic. </param>
-        ///
-        /// <returns>   An asynchronous result that yields true if it succeeds, false if it fails. </returns>
-        ///-------------------------------------------------------------------------------------------------
-
+        /// <summary>Creates a subscription.</summary>
+        /// <param name="topic">The topic.</param>
+        /// <returns>An asynchronous result that yields true if it succeeds, false if it fails.</returns>
         public static async Task<bool> CreateSubscription(fhir.SubscriptionTopic topic)
         {
             try
@@ -244,30 +209,17 @@ namespace devdays_2019_subscription_cs
 
                 fhir.Subscription subscription = new Subscription() 
                 {
-                    Channel = new SubscriptionChannel()
-                    {
-                        Endpoint = url,
-                        HeartbeatPeriod = 60,
-                        Payload = new SubscriptionChannelPayload()
-                        {
-                            Content = SubscriptionChannelPayloadContentCodes.ID_ONLY,
-                            ContentType = "application/fhir+json",
-                        },
-                        Type = new CodeableConcept()
-                        {
-                            Coding = new Coding[]
-                            {
-                                SubscriptionChannelTypeCodes.rest_hook
-                            },
-                            Text = "REST Hook"
-                        }
-                    },
+                    ChannelType = SubscriptionChannelType.rest_hook,
+                    Endpoint = url,
+                    HeartbeatPeriod = 60,
+                    Content = SubscriptionContentCodes.ID_ONLY,
+                    ContentType = "application/fhir+json",
                     FilterBy = new SubscriptionFilterBy[]
                     {
                         new SubscriptionFilterBy()
                         {
-                            MatchType = SubscriptionFilterByMatchTypeCodes.EQUALS,
                             SearchParamName = "patient",
+                            SearchModifier = SubscriptionFilterBySearchModifierCodes.EQUALS,
                             Value = $"Patient/{_patientId}"
                         },
                     },
@@ -287,8 +239,7 @@ namespace devdays_2019_subscription_cs
                         ContractResolver = _contractResolver,
                     });
 
-                // **** build our request ****
-
+                // build our request
                 HttpRequestMessage request = new HttpRequestMessage()
                 {
                     Method = HttpMethod.Post,
@@ -308,12 +259,10 @@ namespace devdays_2019_subscription_cs
                 };
                 request.Headers.Add("Prefer", "return=representation");
 
-                // **** make our request ****
-
+                // make our request
                 HttpResponseMessage response = await _restClient.SendAsync(request);
 
-                // **** check the status code ****
-
+                // check the status code
                 if ((response.StatusCode != System.Net.HttpStatusCode.OK) &&
                     (response.StatusCode != System.Net.HttpStatusCode.Created) &&
                     (response.StatusCode != System.Net.HttpStatusCode.Accepted) &&
@@ -323,18 +272,15 @@ namespace devdays_2019_subscription_cs
                     return false;
                 }
 
-                // **** parse the return ****
-
+                // parse the return
                 string body = await response.Content.ReadAsStringAsync();
 
                 fhir.Subscription sub = JsonConvert.DeserializeObject<fhir.Subscription>(body);
 
-                // **** grab the subscription id so we can clean up ****
-
+                // grab the subscription id so we can clean up
                 _subscriptionId = sub.Id;
 
-                // **** good here ****
-
+                // good here
                 return true;
             }
             catch (Exception ex)
@@ -344,20 +290,13 @@ namespace devdays_2019_subscription_cs
             }
         }
 
-        ///-------------------------------------------------------------------------------------------------
         /// <summary>Deletes the subscription.</summary>
-        ///
-        /// <remarks>Gino Canessa, 11/19/2019.</remarks>
-        ///
         /// <returns>An asynchronous result that yields true if it succeeds, false if it fails.</returns>
-        ///-------------------------------------------------------------------------------------------------
-
         public static async Task<bool> DeleteSubscription()
         {
             try
             {
-                // **** build our request ****
-
+                // build our request
                 HttpRequestMessage request = new HttpRequestMessage()
                 {
                     Method = HttpMethod.Delete,
@@ -371,12 +310,10 @@ namespace devdays_2019_subscription_cs
                     },
                 };
 
-                // **** make our request ****
-
+                // make our request
                 HttpResponseMessage response = await _restClient.SendAsync(request);
 
-                // **** check the status code ****
-
+                // check the status code
                 if ((response.StatusCode != System.Net.HttpStatusCode.OK) &&
                     (response.StatusCode != System.Net.HttpStatusCode.Accepted) &&
                     (response.StatusCode != System.Net.HttpStatusCode.NoContent))
@@ -387,8 +324,7 @@ namespace devdays_2019_subscription_cs
 
                 Console.WriteLine($"Deleted Subscription: Subscription/{_subscriptionId}");
 
-                // **** good here ****
-
+                // good here
                 return true;
             }
             catch (Exception ex)
@@ -398,26 +334,18 @@ namespace devdays_2019_subscription_cs
             }
         }
 
-        ///-------------------------------------------------------------------------------------------------
-        /// <summary>   Creates patient if required. </summary>
-        ///
-        /// <remarks>   Gino Canessa, 11/18/2019. </remarks>
-        ///
-        /// <returns>   An asynchronous result that yields true if it succeeds, false if it fails. </returns>
-        ///-------------------------------------------------------------------------------------------------
-
+        /// <summary>Creates patient if required.</summary>
+        /// <returns>An asynchronous result that yields true if it succeeds, false if it fails.</returns>
         public static async Task<bool> CreatePatientIfRequired()
         {
-            // **** try to get a our patient ****
+            // try to get a our patient
 
             try
             {
-                // **** create a patient id ****
-
+                // create a patient id
                 _patientId = Guid.NewGuid().ToString();
 
-                // **** build our request ****
-
+                // build our request
                 HttpRequestMessage request = new HttpRequestMessage()
                 {
                     Method = HttpMethod.Get,
@@ -431,12 +359,10 @@ namespace devdays_2019_subscription_cs
                     }
                 };
 
-                // **** make our request ****
-
+                // make our request
                 HttpResponseMessage response = await _restClient.SendAsync(request);
 
-                // **** check the status code ****
-
+                // check the status code
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
                     return (await CreatePatient());
@@ -444,20 +370,17 @@ namespace devdays_2019_subscription_cs
 
                 string content = await response.Content.ReadAsStringAsync();
 
-                // **** deserialize ****
-
+                // deserialize
                 fhir.Bundle bundle = JsonConvert.DeserializeObject<fhir.Bundle>(content);
 
-                // **** check for values ****
-
+                // check for values
                 if ((bundle.Entry == null) ||
                     (bundle.Entry.Length == 0))
                 {
                     return (await CreatePatient());
                 }
 
-                // **** good here ****
-
+                // good here
                 return true;
             }
             catch (Exception ex)
@@ -467,18 +390,11 @@ namespace devdays_2019_subscription_cs
             }
         }
 
-        ///-------------------------------------------------------------------------------------------------
-        /// <summary>   Creates the patient. </summary>
-        ///
-        /// <remarks>   Gino Canessa, 11/18/2019. </remarks>
-        ///
-        /// <returns>   An asynchronous result that yields true if it succeeds, false if it fails. </returns>
-        ///-------------------------------------------------------------------------------------------------
-
+        /// <summary>Creates the patient.</summary>
+        /// <returns>An asynchronous result that yields true if it succeeds, false if it fails.</returns>
         public static async Task<bool> CreatePatient()
         {
-            // **** try to get a our patient ****
-
+            // try to get a our patient. 
             try
             {
                 fhir.Patient patient = new Patient()
@@ -505,8 +421,7 @@ namespace devdays_2019_subscription_cs
                         ContractResolver = _contractResolver,
                     });
 
-                // **** build our request ****
-
+                // build our request
                 HttpRequestMessage request = new HttpRequestMessage()
                 {
                     Method = HttpMethod.Put,
@@ -525,12 +440,10 @@ namespace devdays_2019_subscription_cs
                         ),
                 };
 
-                // **** make our request ****
-
+                // make our request
                 HttpResponseMessage response = await _restClient.SendAsync(request);
 
-                // **** check the status code ****
-
+                // check the status code
                 if ((response.StatusCode != System.Net.HttpStatusCode.OK) &&
                     (response.StatusCode != System.Net.HttpStatusCode.Created) &&
                     (response.StatusCode != System.Net.HttpStatusCode.Accepted) &&
@@ -540,8 +453,7 @@ namespace devdays_2019_subscription_cs
                     return false;
                 }
                 
-                // **** good here ****
-
+                // good here
                 return true;
             }
             catch (Exception ex)
@@ -551,24 +463,16 @@ namespace devdays_2019_subscription_cs
             }
         }
 
-        ///-------------------------------------------------------------------------------------------------
-        /// <summary>   Gets the topics. </summary>
-        ///
-        /// <remarks>   Gino Canessa, 11/18/2019. </remarks>
-        ///
-        /// <returns>   The topics. </returns>
-        ///-------------------------------------------------------------------------------------------------
-
+        /// <summary>Gets subscription topics from the server.</summary>
+        /// <returns>The topics.</returns>
         public static async Task<List<fhir.SubscriptionTopic>> GetTopics()
         {
             List<fhir.SubscriptionTopic> topics = new List<fhir.SubscriptionTopic>();
 
-            // **** try to get a list of topics ****
-
+            // try to get a list of topics
             try
             {
-                // **** build our request ****
-
+                // build our request
                 HttpRequestMessage request = new HttpRequestMessage()
                 {
                     Method = HttpMethod.Get,
@@ -582,12 +486,10 @@ namespace devdays_2019_subscription_cs
                     }
                 };
 
-                // **** make our request ****
-
+                // make our request
                 HttpResponseMessage response = await _restClient.SendAsync(request);
 
-                // **** check the status code ****
-
+                // check the status code
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                 {
                     Console.WriteLine($" Could not get SubscriptionTopics: {request.RequestUri.ToString()} returned: {response.StatusCode}");
@@ -596,20 +498,17 @@ namespace devdays_2019_subscription_cs
 
                 string content = await response.Content.ReadAsStringAsync();
 
-                // **** deserialize ****
-
+                // deserialize
                 fhir.Bundle bundle = JsonConvert.DeserializeObject<fhir.Bundle>(content, new fhir.ResourceConverter());
 
-                // **** check for values ****
-
+                // check for values
                 if ((bundle.Entry == null) ||
                     (bundle.Entry.Length == 0))
                 {
                     return topics;
                 }
 
-                // **** traverse topics ****
-
+                // traverse topics
                 foreach (fhir.BundleEntry entry in bundle.Entry)
                 {
                     if (entry.Resource == null)
@@ -617,8 +516,7 @@ namespace devdays_2019_subscription_cs
                         continue;
                     }
 
-                    // **** add this topic (should error check here) ****
-                    
+                    // add this topic (should error check here)
                     topics.Add((fhir.SubscriptionTopic)entry.Resource);
                 }
             }
@@ -628,21 +526,13 @@ namespace devdays_2019_subscription_cs
                 return topics;
             }
 
-            // **** return our list ****
-
+            // return our list
             return topics;
         }
 
-        ///-------------------------------------------------------------------------------------------------
-        /// <summary>   Gets fhir URI. </summary>
-        ///
-        /// <remarks>   Gino Canessa, 11/18/2019. </remarks>
-        ///
-        /// <param name="resource"> (Optional) The resource. </param>
-        ///
-        /// <returns>   The fhir URI. </returns>
-        ///-------------------------------------------------------------------------------------------------
-
+        /// <summary>Gets a FHIR URI.</summary>
+        /// <param name="resource">(Optional) The resource.</param>
+        /// <returns>The FHIR URI.</returns>
         private static Uri GetFhirUri(string resource = "")
         {
             if (string.IsNullOrEmpty(resource))
@@ -653,16 +543,9 @@ namespace devdays_2019_subscription_cs
             return new Uri(new Uri(Configuration["Basic_Fhir_Server_Url"]), resource);
         }
 
-        ///-------------------------------------------------------------------------------------------------
-        /// <summary>   Creates web host builder. </summary>
-        ///
-        /// <remarks>   Gino Canessa, 11/18/2019. </remarks>
-        ///
-        /// <param name="args"> The arguments. </param>
-        ///
-        /// <returns>   The new web host builder. </returns>
-        ///-------------------------------------------------------------------------------------------------
-
+        /// <summary>Creates web host builder.</summary>
+        /// <param name="args">The arguments.</param>
+        /// <returns>The new web host builder.</returns>
         public static IWebHostBuilder CreateWebHostBuilder(string[] args) =>
             WebHost.CreateDefaultBuilder(args)
                 .UseUrls(Configuration["Basic_Internal_Url"])
